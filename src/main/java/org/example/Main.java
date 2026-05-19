@@ -1,17 +1,15 @@
 package org.example;
 
 import com.google.gson.Gson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class Main {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
         Gson gson = new Gson();
@@ -49,8 +47,8 @@ public class Main {
         addresses.add("456 Oak St, Othertown, USA");
         user.setAddresses(addresses);
 
-        LOGGER.info("Before Sanitization:\n{}", gson.toJson(user));
+        log.info("Before Sanitization:\n{}", gson.toJson(user));
         String jsonOjbect = SanitizeUtil.toJson(user);
-        LOGGER.info("After Sanitization:\n{}", jsonOjbect);
+        log.info("After Sanitization:\n{}", jsonOjbect);
     }
 }

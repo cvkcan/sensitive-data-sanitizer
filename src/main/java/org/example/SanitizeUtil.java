@@ -1,15 +1,15 @@
 package org.example;
 
 import com.google.gson.Gson;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
 
+@Slf4j
 public class SanitizeUtil {
 
     /**
@@ -38,7 +38,6 @@ public class SanitizeUtil {
     );
 
     private static final Gson gson = new Gson();
-    private static final Logger LOGGER = LoggerFactory.getLogger(SanitizeUtil.class);
 
     private static boolean isSensitive(String fieldName) {
         return SENSITIVE_KEY_PATTERN.matcher(fieldName).find();
@@ -109,7 +108,7 @@ public class SanitizeUtil {
             }
             jsonString = gson.toJson(tObject);
         } catch (Exception e) {
-            LOGGER.error("Error during sanitization: {}", e.getMessage());
+            log.error("Error during sanitization: {}", e.getMessage());
             jsonString = StringUtils.EMPTY;
         }
         return jsonString;
