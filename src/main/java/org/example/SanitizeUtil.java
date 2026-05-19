@@ -3,20 +3,46 @@ package org.example;
 import com.google.gson.Gson;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 public class SanitizeUtil {
 
-    private static final List<String> SENSITIVE_FIELDS = List.of(
-            "username", "password", "ssn", "apikey", "authtoken", "accesstoken", "secretkey", "privatekey",
-            "bankaccountnumber", "creditcardnumber", "cvv", "pin"
+    /**
+     * Regex pattern that matches field/key names containing sensitive data terms in
+     * both Turkish and English (case-insensitive). Applied with {@code find()} so any
+     * field whose name contains one of these terms is treated as sensitive.
+     *
+     * Turkish terms: sifre/şifre (password), parola (password), kullanıcı (username),
+     *   tckn/tc_no/kimlik (national ID), banka/hesap (bank account), kredi/kart (credit card),
+     *   eposta/e-posta (e-mail), adres (address), telefon/gsm (phone), vergi (tax number)
+     *
+     * English terms: password/passwd/pass, username, ssn, api_key, auth_token,
+     *   access_token, secret, private_key, token, bank_account, credit_card,
+     *   cvv/cvc, pin, email, address, phone, tax
+     */
+    private static final Pattern SENSITIVE_KEY_PATTERN = Pattern.compile(
+            "(?i)" +
+            // Turkish
+            "sifre|şifre|parola|kullan[iı]c[iı]|tckn|tc[_\\s]?no|kimlik|" +
+            "banka|hesap|kredi|kart[\\s_]?no|eposta|e[_\\-]?posta|adres|telefon|gsm|vergi|" +
+            // English
+            "password|passwd|pass|username|ssn|" +
+            "api[_\\-]?key|auth[_\\-]?token|access[_\\-]?token|" +
+            "private[_\\-]?key|secret|token|bank[_\\-]?account|credit[_\\-]?card|" +
+            "cvv|cvc|pin|email|address|phone|tax"
     );
 
     private static final Gson gson = new Gson();
-    private static final Logger LOGGER = Logger.getLogger(SanitizeUtil.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(SanitizeUtil.class);
+
+    private static boolean isSensitive(String fieldName) {
+        return SENSITIVE_KEY_PATTERN.matcher(fieldName).find();
+    }
 
     public static String toJson(Object object) {
         return sanitize(object);
@@ -35,14 +61,11 @@ public class SanitizeUtil {
                 for (Field field : declaredFields) {
                     field.setAccessible(true);
                     Object value = field.get(object);
-                    if (SENSITIVE_FIELDS.contains(field.getName().toLowerCase())) {
-                        field.set(tObject, "***");
-                    } else if (value instanceof Collection<?>) {
+                    if (value instanceof Collection<?>) {
                         Collection<Object> sanitizedCollection = new ArrayList<>();
                         Collection<?> collection = (Collection<?>) value;
                         String fieldName = field.getName();
-                        boolean anyFieldsMatch = SENSITIVE_FIELDS.stream()
-                                .anyMatch(fieldName::startsWith);
+                        boolean anyFieldsMatch = isSensitive(fieldName);
                         for (Object o : collection) {
                             boolean isPojo = o != null
                                     && !o.getClass().isPrimitive()
@@ -71,14 +94,14 @@ public class SanitizeUtil {
                             Object key = entry.getKey();
                             Object val = entry.getValue();
                             if (key instanceof String strKey) {
-                                String lowerKey = strKey.toLowerCase();
-                                sanitizedMap.put(key, SENSITIVE_FIELDS.contains(lowerKey) ? "****" : val
-                                );
+                                sanitizedMap.put(key, isSensitive(strKey) ? "****" : val);
                             } else {
                                 sanitizedMap.put(key, sanitize(key));
                             }
                         }
                         field.set(tObject, sanitizedMap);
+                    } else if (isSensitive(field.getName())) {
+                        field.set(tObject, "***");
                     } else {
                         field.set(tObject, value);
                     }
@@ -86,7 +109,7 @@ public class SanitizeUtil {
             }
             jsonString = gson.toJson(tObject);
         } catch (Exception e) {
-            LOGGER.severe("Error during sanitization: " + e.getMessage());
+            LOGGER.error("Error during sanitization: {}", e.getMessage());
             jsonString = StringUtils.EMPTY;
         }
         return jsonString;
